@@ -17,7 +17,7 @@
 
 - **`requirements.txt`**: зависимости (`httpx`, `PyYAML`).
 - **`models_config.yaml`**: все характеристики моделей и настройки OpenRouter:
-  - какие модели (**ключи в секции `models`**),
+  - какие модели (**ключи в секции `models` — те же, что идентификаторы моделей в OpenRouter**),
   - лимиты токенов (`max_output_tokens`),
   - температура, `reasoning` и любые дополнительные параметры.
 - **`openrouter_client.py`**:
@@ -78,8 +78,8 @@ export OPENROUTER_API_KEY="your_api_key_here"
 ```bash
 python run_benchmark.py ^
   --prompts prompts.jsonl ^
-  --model gpt5_mini ^
-  --output-dir runs/gpt5_mini
+  --model openai/gpt-5-mini ^
+  --output-dir runs/gpt-5-mini
 ```
 
 Дополнительно можно указать:
@@ -92,7 +92,7 @@ python run_benchmark.py ^
 ### Логирование результатов
 
 - Для каждого промпта создаётся **отдельный JSON‑файл** в указанном `--output-dir`:
-  - имя файла: `id__model_name.json` (например, `problem_1__gpt4_1_mini.json`),
+  - имя файла: `id__model_name.json` (например, `problem_1__openai_gpt-5-mini.json`),
   - содержимое включает:
     - `id`, `model_name`, `model`,
     - `openrouter_response` — полный JSON‑ответ OpenRouter **или** `error` в случае ошибки.

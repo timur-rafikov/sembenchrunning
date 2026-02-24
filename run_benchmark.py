@@ -53,8 +53,19 @@ async def run_for_model(
 
   processed_count = 0
 
+  print(
+    f"[sembenchrunning] Run start: model='{model_name}', "
+    f"prompts='{prompts_path}', output_dir='{output_dir}', "
+    f"batch_size={effective_batch_size}, "
+    f"max_concurrent={settings.max_concurrent_requests}, "
+    f"limit={limit if limit is not None else 'all'}",
+    flush=True,
+  )
+
   async with OpenRouterClient(settings) as client:
     current_batch: List[PromptItem] = []
+
+    batch_index = 0
 
     with prompts_path.open("r", encoding="utf-8") as f:
       for line in f:
@@ -72,6 +83,12 @@ async def run_for_model(
           break
 
         if len(current_batch) >= effective_batch_size:
+          batch_index += 1
+          print(
+            f"[sembenchrunning] Model '{model_name}': starting batch #{batch_index} "
+            f"({len(current_batch)} prompts, total read={processed_count})",
+            flush=True,
+          )
           await _process_batch(
             client=client,
             model_name=model_name,
@@ -80,9 +97,19 @@ async def run_for_model(
             output_dir=output_dir,
             semaphore=semaphore,
           )
+          print(
+            f"[sembenchrunning] Model '{model_name}': batch #{batch_index} completed.",
+            flush=True,
+          )
           current_batch = []
 
     if current_batch:
+      batch_index += 1
+      print(
+        f"[sembenchrunning] Model '{model_name}': starting final batch "
+        f"#{batch_index} ({len(current_batch)} prompts, total read={processed_count})",
+        flush=True,
+      )
       await _process_batch(
         client=client,
         model_name=model_name,
@@ -91,9 +118,19 @@ async def run_for_model(
         output_dir=output_dir,
         semaphore=semaphore,
       )
+      print(
+        f"[sembenchrunning] Model '{model_name}': final batch #{batch_index} completed.",
+        flush=True,
+      )
 
   if processed_count == 0:
     raise SystemExit("Не найдено ни одного промпта в файле.")
+  else:
+    print(
+      f"[sembenchrunning] Run finished: model='{model_name}', "
+      f"processed_prompts={processed_count}, batches={batch_index}",
+      flush=True,
+    )
 
 
 async def _process_batch(
@@ -105,6 +142,10 @@ async def _process_batch(
   semaphore: asyncio.Semaphore,
 ) -> None:
   """Запускает один батч промптов параллельно."""
+  print(
+    f"[sembenchrunning] Model '{model_name}': launching {len(batch)} tasks in batch...",
+    flush=True,
+  )
   tasks: List[asyncio.Task[None]] = []
   for item in batch:
     tasks.append(
@@ -131,8 +172,11 @@ async def _run_single_prompt(
   semaphore: asyncio.Semaphore,
 ) -> None:
   """Отправляет один промпт в OpenRouter и сохраняет JSON‑лог."""
-  # Один файл на (модель, id промпта)
-  out_path = output_dir / f"{item.id}__{model_name}.json"
+  # Один файл на (модель, id промпта).
+  # В имени файла символы '/' из идентификатора модели заменяем на '_',
+  # чтобы не создавать вложенные директории.
+  safe_model_name = model_name.replace("/", "_")
+  out_path = output_dir / f"{item.id}__{safe_model_name}.json"
 
   # Примитивный "resume": если файл есть — пропускаем.
   if out_path.exists():
@@ -151,6 +195,10 @@ async def _run_single_prompt(
       }
     except InsufficientBalanceError as exc:
       # Логируем, что именно произошло, и пробрасываем дальше, чтобы остановить скрипт.
+      print(
+        f"[sembenchrunning] Model '{model_name}': insufficient credits error on request id='{item.id}': {exc}",
+        flush=True,
+      )
       payload = {
         "id": item.id,
         "model_name": model_name,
@@ -166,6 +214,10 @@ async def _run_single_prompt(
       raise
     except OpenRouterAPIError as exc:
       # Структурированное логирование API‑ошибки OpenRouter.
+      print(
+        f"[sembenchrunning] Model '{model_name}': OpenRouterAPIError on request id='{item.id}': {exc}",
+        flush=True,
+      )
       payload = {
         "id": item.id,
         "model_name": model_name,
@@ -181,6 +233,10 @@ async def _run_single_prompt(
       return
     except Exception as exc:
       # Любая другая ошибка (сети, сериализация и т.п.)
+      print(
+        f"[sembenchrunning] Model '{model_name}': unexpected error on request id='{item.id}': {exc}",
+        flush=True,
+      )
       payload = {
         "id": item.id,
         "model_name": model_name,
@@ -219,7 +275,11 @@ def parse_args() -> argparse.Namespace:
     "--model",
     type=str,
     required=True,
-    help="Имя модели из секции 'models' в конфиге (например, gpt5_mini).",
+    help=(
+      "Имя модели из секции 'models' в конфиге, "
+      "совпадающее с идентификатором модели в OpenRouter "
+      "(например, openai/gpt-5-mini)."
+    ),
   )
   parser.add_argument(
     "--output-dir",
