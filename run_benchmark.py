@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
-from autoplanbench_utils import ensure_domain_json, get_apb_root
+from autoplanbench_utils import ensure_domain_json, get_apb_root, sha256_file as _sha256_file
 from dataset_contracts import (
   derive_section_key as _shared_derive_section_key,
   extract_sample_coords as _shared_extract_sample_coords,
@@ -125,11 +125,11 @@ def _load_prompt_translator(spec: str) -> Callable[..., str]:
   return getattr(module, func_name)
 
 
-def _load_prompt_template(dataset_dir: Path) -> str:
+def _load_prompt_template(dataset_dir: Path, *, max_depth: int = 10) -> str:
   """Читает шаблон промпта из prompt_template.txt в корне датасета или одном из родителей."""
   cur = dataset_dir.resolve()
   checked: List[Path] = []
-  while True:
+  for _ in range(max_depth):
     path = cur / "prompt_template.txt"
     checked.append(path)
     if path.exists():
@@ -147,18 +147,6 @@ def _load_prompt_template(dataset_dir: Path) -> str:
 def _sha256_text(value: str) -> str:
   return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
-
-def _sha256_file(path: Optional[Path]) -> Optional[str]:
-  if path is None or not path.exists() or not path.is_file():
-    return None
-  h = hashlib.sha256()
-  with path.open("rb") as f:
-    while True:
-      chunk = f.read(1024 * 1024)
-      if not chunk:
-        break
-      h.update(chunk)
-  return h.hexdigest()
 
 
 def _prompt_translator_signature(
@@ -281,6 +269,20 @@ def _provider_error_from_response(response_json: Dict[str, Any]) -> Optional[Dic
     return None
 
 
+def _callable_accepts_param(func: Callable, name: str) -> bool:
+  """Check if *func* accepts a keyword argument *name* (or **kwargs)."""
+  try:
+    sig = inspect.signature(func)
+  except (ValueError, TypeError):
+    return False
+  for p in sig.parameters.values():
+    if p.name == name:
+      return True
+    if p.kind == inspect.Parameter.VAR_KEYWORD:
+      return True
+  return False
+
+
 def _get_domain_problem_nl(
   prompt_translator: Callable[..., str],
   domain_pddl: str,
@@ -292,24 +294,17 @@ def _get_domain_problem_nl(
 ) -> str:
   """Возвращает только NL-перевод домена/задачи (без шаблона промпта)."""
   kwargs: Dict[str, Optional[str]] = {}
-  if domain_path is not None:
+  if domain_path is not None and _callable_accepts_param(prompt_translator, "domain_path"):
     kwargs["domain_path"] = str(domain_path)
-  if problem_path is not None:
+  if problem_path is not None and _callable_accepts_param(prompt_translator, "problem_path"):
     kwargs["problem_path"] = str(problem_path)
-  if domain_nl_path is not None:
+  if domain_nl_path is not None and _callable_accepts_param(prompt_translator, "domain_nl_path"):
     kwargs["domain_nl_path"] = str(domain_nl_path)
   if kwargs:
-    try:
-      return str(prompt_translator(domain_pddl, problem_pddl, **kwargs))
-    except TypeError:
-      try:
-        return str(prompt_translator(domain_pddl, problem_pddl, sample))
-      except TypeError:
-        return str(prompt_translator(domain_pddl, problem_pddl))
-  try:
-    return str(prompt_translator(domain_pddl, problem_pddl))
-  except TypeError:
+    return str(prompt_translator(domain_pddl, problem_pddl, **kwargs))
+  if _callable_accepts_param(prompt_translator, "sample"):
     return str(prompt_translator(domain_pddl, problem_pddl, sample))
+  return str(prompt_translator(domain_pddl, problem_pddl))
 
 
 def _build_prompt_from_sample(
@@ -875,19 +870,16 @@ def _call_translator(
   - f(nl_plan, domain_path=..., problem_path=..., domain_nl_path=...) -> str (для AutoPlanBench и др.).
   """
   kwargs: Dict[str, Optional[str]] = {}
-  if domain_path is not None:
+  if domain_path is not None and _callable_accepts_param(translator, "domain_path"):
     kwargs["domain_path"] = str(domain_path)
-  if problem_path is not None:
+  if problem_path is not None and _callable_accepts_param(translator, "problem_path"):
     kwargs["problem_path"] = str(problem_path)
-  if domain_nl_path is not None:
+  if domain_nl_path is not None and _callable_accepts_param(translator, "domain_nl_path"):
     kwargs["domain_nl_path"] = str(domain_nl_path)
-  if debug_path is not None:
+  if debug_path is not None and _callable_accepts_param(translator, "debug_path"):
     kwargs["debug_path"] = str(debug_path)
   if kwargs:
-    try:
-      return str(translator(nl_plan, **kwargs))
-    except TypeError:
-      return str(translator(nl_plan))
+    return str(translator(nl_plan, **kwargs))
   return str(translator(nl_plan))
 
 
@@ -918,7 +910,7 @@ def _get_nl_plan_from_run(
     return None
 
 
-def _parse_section_subsection(example_id: str) -> Optional[Tuple[str, str, Optional[Union[int, str]]]]:
+def _parse_example_id_parts(example_id: str) -> Optional[Tuple[str, str, Optional[Union[int, str]]]]:
   """
   Из id вида section__subsection, section__subsection__N или section__subsection__name возвращает
   (section, subsection, sample_index). sample_index — номер сэмпла (int), имя папки сэмпла (str)
@@ -1079,7 +1071,7 @@ def compute_metrics_phase(
         _debug(f"  {path.name}: use cached plan_pred_pddl")
         continue
       example_id = data.get("id", path.stem)
-      parsed = _parse_section_subsection(example_id)
+      parsed = _parse_example_id_parts(example_id)
       if not parsed:
         continue
       section, subsection, sample_index = parsed
@@ -1204,6 +1196,10 @@ def compute_metrics_phase(
       )
     )
 
+  def _on_val_failure_cb(val_result):
+    step = getattr(val_result, "first_failing_step", None)
+    _debug(f"    VAL failed step={step} stderr={repr((val_result.stderr or '').strip()[:400])}")
+
   for path in sorted(run_files):
     stem = path.stem
     if "__" not in stem:
@@ -1247,7 +1243,7 @@ def compute_metrics_phase(
       except OSError as e:
         print(f"[sembenchrunning] Warning: could not write pipeline_usage to {path.name}: {e}", flush=True)
     example_id = data.get("id", safe_id)
-    parsed = _parse_section_subsection(example_id)
+    parsed = _parse_example_id_parts(example_id)
     if not parsed:
       print(f"[sembenchrunning] Skip {path.name}: id must be section__subsection or section__subsection__N, got {example_id!r}", flush=True)
       _append_metric_row(
@@ -1375,10 +1371,6 @@ def compute_metrics_phase(
       continue
     _debug(f"    run VAL + compute_metrics ...")
 
-    def _on_val_failure(val_result):
-      step = getattr(val_result, "first_failing_step", None)
-      _debug(f"    VAL failed step={step} stderr={repr((val_result.stderr or '').strip()[:400])}")
-
     try:
       m = compute_metrics(
         domain_pddl=domain_pddl,
@@ -1387,7 +1379,7 @@ def compute_metrics_phase(
         plan_ref_pddl=plan_ref_pddl,  # может быть None
         val_binary=val_binary,
         val_timeout_seconds=int(val_timeout_seconds),
-        on_val_failure=_on_val_failure if DEBUG else None,
+        on_val_failure=_on_val_failure_cb if DEBUG else None,
       )
     except Exception as e:
       print(f"[sembenchrunning] VAL/metrics error for {path.name}: {e}", flush=True)

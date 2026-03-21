@@ -24,7 +24,10 @@ def get_apb_root(apb_root: Optional[Path] = None) -> Optional[Path]:
   return None
 
 
-def _sha256_file(path: Path) -> str:
+def sha256_file(path: Optional[Path]) -> Optional[str]:
+  """SHA-256 hex digest of a file. Returns None if path is None or file missing."""
+  if path is None or not path.exists() or not path.is_file():
+    return None
   h = hashlib.sha256()
   with path.open("rb") as f:
     while True:
@@ -52,8 +55,8 @@ def _build_domain_setup_manifest(
     "version": 1,
     "seed": int(seed),
     "llm": llm,
-    "domain_sha256": _sha256_file(first_domain_pddl),
-    "problem_sha256": _sha256_file(first_problem_pddl),
+    "domain_sha256": sha256_file(first_domain_pddl),
+    "problem_sha256": sha256_file(first_problem_pddl),
     "apb_root": str(apb_root.resolve()),
     "run_domain_setup_mtime_ns": script_path.stat().st_mtime_ns if script_path.exists() else None,
   }

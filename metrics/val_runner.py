@@ -37,29 +37,23 @@ def run_val(
     Returns ValResult with executable, goal_reached, and first_failing_step.
     """
     use_temp = output_dir is None
-    if use_temp:
-        tmp_ctx = tempfile.TemporaryDirectory(prefix="val_")
-        tmp = Path(tmp_ctx.__enter__())
-    else:
-        tmp = Path(output_dir)
-        tmp.mkdir(parents=True, exist_ok=True)
 
-    domain_path = tmp / "domain.pddl"
-    problem_path = tmp / "problem.pddl"
-    plan_path = tmp / "plan.pddl"
+    def _run_in_dir(tmp: Path) -> ValResult:
+        domain_path = tmp / "domain.pddl"
+        problem_path = tmp / "problem.pddl"
+        plan_path = tmp / "plan.pddl"
 
-    domain_path.write_text(domain_pddl, encoding="utf-8")
-    problem_path.write_text(problem_pddl, encoding="utf-8")
-    plan_content = "\n".join(plan_steps) + "\n"
-    plan_path.write_text(plan_content, encoding="utf-8")
+        domain_path.write_text(domain_pddl, encoding="utf-8")
+        problem_path.write_text(problem_pddl, encoding="utf-8")
+        plan_content = "\n".join(plan_steps) + "\n"
+        plan_path.write_text(plan_content, encoding="utf-8")
 
-    debug_val = os.environ.get("DEBUG_VAL", "")
-    if debug_val:
-        print(f"[VAL DEBUG] Plan steps ({len(plan_steps)}): {plan_steps[:3]}...")
+        debug_val = os.environ.get("DEBUG_VAL", "")
+        if debug_val:
+            print(f"[VAL DEBUG] Plan steps ({len(plan_steps)}): {plan_steps[:3]}...")
 
-    result: Optional[subprocess.CompletedProcess[str]] = None
-    run_error: Optional[BaseException] = None
-    try:
+        result: Optional[subprocess.CompletedProcess[str]] = None
+        run_error: Optional[BaseException] = None
         try:
             result = subprocess.run(
                 [val_binary, str(domain_path), str(problem_path), str(plan_path)],
@@ -70,9 +64,23 @@ def run_val(
             )
         except BaseException as exc:
             run_error = exc
-    finally:
-        if use_temp:
-            tmp_ctx.__exit__(None, None, None)
+        return _parse_val_output(result, run_error, timeout_seconds)
+
+    if use_temp:
+        with tempfile.TemporaryDirectory(prefix="val_") as tmp_name:
+            return _run_in_dir(Path(tmp_name))
+    else:
+        out = Path(output_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        return _run_in_dir(out)
+
+
+def _parse_val_output(
+    result: Optional[subprocess.CompletedProcess],
+    run_error: Optional[BaseException],
+    timeout_seconds: int,
+) -> ValResult:
+    """Parse subprocess result from VAL into a ValResult."""
     if result is None:
         if isinstance(run_error, subprocess.TimeoutExpired):
             stdout = (run_error.stdout or "") if isinstance(run_error.stdout, str) else ""
@@ -94,52 +102,33 @@ def run_val(
     stdout = result.stdout or ""
     stderr = result.stderr or ""
 
-    # VAL exits 0 only when the plan is fully valid (all actions applicable AND goal reached).
-    # On non-zero exit two distinct cases must be separated:
-    #   1. An action was not applicable → executable=False, goal_reached=False
-    #   2. All actions executed but goal not satisfied → executable=True, goal_reached=False
-    # Detecting case 2 requires inspecting VAL's output for goal-failure phrases.
     executable = goal_reached = False
     first_failing_step: Optional[int] = None
 
     combined = f"{stdout}\n{stderr}".lower()
 
+    _GOAL_FAILURE_TOKENS = (
+        "goal not satisfied",
+        "goal not reached",
+        "goal not",
+        "goal unsatisfied",
+        "unsatisfied goal",
+    )
+
     if result.returncode == 0:
         executable = True
-        # Defensive check: some VAL versions may still print "goal not" while exiting 0.
-        goal_reached = not any(
-            token in combined
-            for token in (
-                "goal not satisfied", "goal not reached", "goal not",
-                "goal unsatisfied", "unsatisfied goal",
-            )
-        )
-        # No step failed; first_failing_step stays None.
+        goal_reached = not any(token in combined for token in _GOAL_FAILURE_TOKENS)
     else:
-        # Tokens that indicate the plan executed fully but goal was not satisfied.
-        _GOAL_FAILURE_TOKENS = (
-            "goal not satisfied",
-            "goal not reached",
-            "goal not",
-            "goal unsatisfied",
-            "unsatisfied goal",
-        )
         if any(t in combined for t in _GOAL_FAILURE_TOKENS):
-            # All actions were applicable; the plan just doesn't achieve the goal.
             executable = True
             goal_reached = False
-            # first_failing_step remains None — no action step failed.
         else:
-            # An action was not applicable during execution.
             executable = False
             goal_reached = False
-            # VAL prints "Checking next happening (time N)" for each step it processes.
-            # The last such occurrence is the step that failed.
             time_matches = re.findall(r"happening\s*\(\s*time\s+(\d+)\s*\)", combined)
             if time_matches:
                 first_failing_step = int(time_matches[-1])
             else:
-                # Fallback patterns for other VAL output variants.
                 step_match = re.search(
                     r"at\s+time\s+(\d+)"
                     r"|(?:action|step)\s*[:#]?\s*(\d+)"
@@ -151,7 +140,6 @@ def run_val(
                 if step_match:
                     first_failing_step = int(next(g for g in step_match.groups() if g))
 
-    # DEBUG: Print VAL output (set DEBUG_VAL=1 to enable)
     debug_val = os.environ.get("DEBUG_VAL", "")
     if debug_val:
         print(f"[VAL DEBUG] exit={result.returncode} exec={executable} goal={goal_reached}")

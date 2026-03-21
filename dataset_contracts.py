@@ -123,9 +123,9 @@ def derive_section_key(
 ) -> str:
   rel_domain_nl = sample.get("domain_nl_path")
   if rel_domain_nl:
-    parent = Path(str(rel_domain_nl)).parent
-    if parent.parts:
-      return parent.as_posix()
+    p = Path(str(rel_domain_nl))
+    if not p.is_absolute() and p.parent.parts:
+      return p.parent.as_posix()
   if section and subsection and sample_index is not None:
     return f"{section}/{subsection}/{sample_index}"
   return f"{section}/{subsection}" if section and subsection else ""
