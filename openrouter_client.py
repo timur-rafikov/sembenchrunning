@@ -37,6 +37,44 @@ class InsufficientBalanceError(OpenRouterAPIError):
   """Недостаточно средств / кредитов на OpenRouter (HTTP 402)."""
 
 
+def _extract_choice_error_info(response_json: Any) -> Optional[Dict[str, Any]]:
+  """Извлекает ошибку провайдера из envelope OpenRouter choices[0].error."""
+  if not isinstance(response_json, dict):
+    return None
+  choices = response_json.get("choices")
+  if not isinstance(choices, list) or not choices:
+    return None
+  choice0 = choices[0]
+  if not isinstance(choice0, dict):
+    return None
+  err = choice0.get("error")
+  if not isinstance(err, dict) or not err:
+    return None
+  return {
+    "code": err.get("code"),
+    "message": err.get("message") or str(err),
+    "metadata": err.get("metadata"),
+    "raw": err,
+  }
+
+
+def _is_transient_error_info(error_info: Dict[str, Any]) -> bool:
+  code = error_info.get("code")
+  try:
+    code_int = int(code)
+  except (TypeError, ValueError):
+    code_int = None
+  if code_int == 429 or (code_int is not None and code_int >= 500):
+    return True
+  metadata = error_info.get("metadata")
+  if isinstance(metadata, dict):
+    err_type = str(metadata.get("error_type") or "").lower()
+    if err_type in {"provider_unavailable", "rate_limited", "timeout"}:
+      return True
+  message = str(error_info.get("message") or "").lower()
+  return any(token in message for token in ("temporar", "timeout", "network connection lost", "provider unavailable"))
+
+
 def load_config(path: str) -> Dict[str, Any]:
   """Загрузка YAML‑конфига моделей и настроек OpenRouter."""
   with open(path, "r", encoding="utf-8") as f:
@@ -135,9 +173,12 @@ class OpenRouterClient:
       ],
     }
 
+    # OpenRouter supports OpenAI-style Chat Completions (max_tokens) but some providers/models
+    # use the newer Responses-style naming (max_output_tokens). We send both for compatibility.
     max_tokens = model_cfg.get("max_output_tokens")
     if max_tokens is not None:
       body["max_tokens"] = int(max_tokens)
+      body["max_output_tokens"] = int(max_tokens)
 
     temperature = model_cfg.get("temperature")
     if temperature is not None:
@@ -145,7 +186,12 @@ class OpenRouterClient:
 
     reasoning = model_cfg.get("reasoning")
     if reasoning is not None:
-      body["reasoning"] = reasoning
+      # OpenRouter expects an object for reasoning (e.g., {"effort": "high"}).
+      # Allow legacy shorthand strings like "high".
+      if isinstance(reasoning, str):
+        body["reasoning"] = {"effort": reasoning}
+      else:
+        body["reasoning"] = reasoning
 
     if extra_params:
       body.update(extra_params)
@@ -172,28 +218,55 @@ class OpenRouterClient:
         else:
           # Любые "нормальные" ошибки и успешный ответ обрабатываем отдельно.
           if 200 <= response.status_code < 300:
-            return response.json()
+            response_json = response.json()
+            choice_error = _extract_choice_error_info(response_json)
+            if choice_error is None:
+              return response_json
 
-          error_body = self._safe_json(response)
-          error_info = self._extract_error_info(error_body)
+            code = choice_error.get("code")
+            try:
+              code_int = int(code)
+            except (TypeError, ValueError):
+              code_int = None
+            if code_int == 402 or "insufficient" in str(choice_error.get("message") or "").lower():
+              raise InsufficientBalanceError(
+                status_code=code_int,
+                message=str(choice_error.get("message") or "Insufficient OpenRouter credits."),
+                error_body=response_json,
+              )
+            if _is_transient_error_info(choice_error):
+              last_exc = OpenRouterAPIError(
+                status_code=code_int,
+                message=str(choice_error.get("message") or "OpenRouter transient provider error"),
+                error_body=response_json,
+              )
+            else:
+              raise OpenRouterAPIError(
+                status_code=code_int,
+                message=str(choice_error.get("message") or "OpenRouter provider error"),
+                error_body=response_json,
+              )
+          else:
+            error_body = self._safe_json(response)
+            error_info = self._extract_error_info(error_body)
 
-          # Специальная обработка 402 — недостаточно кредитов.
-          if response.status_code == 402 or (
-            error_info.get("code") == 402
-            or "insufficient" in error_info.get("message", "").lower()
-          ):
-            raise InsufficientBalanceError(
+            # Специальная обработка 402 — недостаточно кредитов.
+            if response.status_code == 402 or (
+              error_info.get("code") == 402
+              or "insufficient" in error_info.get("message", "").lower()
+            ):
+              raise InsufficientBalanceError(
+                status_code=response.status_code,
+                message=error_info.get("message", "Insufficient OpenRouter credits."),
+                error_body=error_body,
+              )
+
+            # Остальные ошибки — как общие API‑ошибки.
+            raise OpenRouterAPIError(
               status_code=response.status_code,
-              message=error_info.get("message", "Insufficient OpenRouter credits."),
+              message=error_info.get("message", f"OpenRouter error {response.status_code}"),
               error_body=error_body,
             )
-
-          # Остальные ошибки — как общие API‑ошибки.
-          raise OpenRouterAPIError(
-            status_code=response.status_code,
-            message=error_info.get("message", f"OpenRouter error {response.status_code}"),
-            error_body=error_body,
-          )
 
       except (httpx.RequestError, httpx.HTTPStatusError) as exc:
         last_exc = exc
